@@ -72,22 +72,22 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
         // -------------------------------
         // apply styles
         if (this.isMarkdownBlock) {
-            AnsiConsole.Write ( new Markup ( c.ToString ().EscapeMarkup (), new Style ( foreground: Color.DarkSlateGray3 ) ) );
+            AnsiConsole.Write ( new RawText ( c.ToString (), new Style ( foreground: Color.DarkSlateGray3 ) ) );
         }
         else if (this.isThink) {
-            AnsiConsole.Write ( new Markup ( c.ToString ().EscapeMarkup (), new Style ( foreground: Color.Grey, decoration: Decoration.Italic ) ) );
+            AnsiConsole.Write ( new RawText ( c.ToString (), new Style ( foreground: Color.Grey, decoration: Decoration.Italic ) ) );
         }
         else if (this.isBold) {
-            AnsiConsole.Write ( new Markup ( c.ToString ().EscapeMarkup (), new Style ( foreground: Color.White, decoration: Decoration.Bold ) ) );
+            AnsiConsole.Write ( new RawText ( c.ToString (), new Style ( foreground: Color.White, decoration: Decoration.Bold ) ) );
         }
         else if (this.isItalic) {
-            AnsiConsole.Write ( new Markup ( c.ToString ().EscapeMarkup (), new Style ( foreground: Color.White, decoration: Decoration.Italic ) ) );
+            AnsiConsole.Write ( new RawText ( c.ToString (), new Style ( foreground: Color.White, decoration: Decoration.Italic ) ) );
         }
         else if (this.HeadingRegex.IsMatch ( line )) {
-            AnsiConsole.Write ( new Markup ( c.ToString ().EscapeMarkup (), new Style ( foreground: Color.White, decoration: Decoration.Bold | Decoration.Underline ) ) );
+            AnsiConsole.Write ( new RawText ( c.ToString (), new Style ( foreground: Color.White, decoration: Decoration.Bold | Decoration.Underline ) ) );
         }
         else {
-            AnsiConsole.Write ( c.ToString ().EscapeMarkup () );
+            AnsiConsole.Write ( new RawText ( c.ToString () ) );
         }
     }
 
