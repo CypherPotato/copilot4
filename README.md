@@ -2,7 +2,7 @@
 
 Copilot4 is an experimental AI chatbot project that works in your console, similar to [Ollama](https://ollama.com/), but for cloud models like Deepseek, Groq, OpenAI, Mistral, or any other model compatible with the OpenAI API.
 
-https://github.com/CypherPotato/copilot4/raw/refs/heads/master/.github/presentation.mp4
+https://github.com/user-attachments/assets/b02f1ba5-24e1-45c5-beb7-dfa2fac626c1
 
 Some of the features:
 - **Multi-models:** configure multiple models with their own *system prompts* from different sources that share an OpenAI-compatible API. Even Ollama works here.
