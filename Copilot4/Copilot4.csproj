@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<ApplicationIcon>Copilot4.ico</ApplicationIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Content Include="Copilot4.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CypherPotato.CommandLine" Version="1.0.1" />
+		<PackageReference Include="CypherPotato.SqliteDictionary" Version="0.4.0-beta1" />
+		<PackageReference Include="Markdig" Version="0.40.0" />
+		<PackageReference Include="Spectre.Console" Version="0.49.2-preview.0.75" />
+		<PackageReference Include="Spectre.Console.Json" Version="0.49.2-preview.0.75" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\LightJson\Sources\LightJson\LightJson.csproj" />
+	  <ProjectReference Include="..\..\PrettyPrompt\src\PrettyPrompt\PrettyPrompt.csproj" />
+	</ItemGroup>
+
+</Project>
