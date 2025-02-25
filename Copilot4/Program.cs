@@ -250,7 +250,7 @@ readNum:
 
                 isSendingMessage = true;
                 try {
-                    ISyntaxHighlighter syntaxHighlighter = CurrentModel.GetSyntaxHighlighter ();
+                    using ISyntaxHighlighter syntaxHighlighter = CurrentModel.GetSyntaxHighlighter ();
 
                     await foreach (var chunk in Inference.GetCompletionsStreamAsync ( CurrentModel, CurrentChatSession, cancellation.Token )) {
                         assistantMessageBuilder.Append ( chunk );

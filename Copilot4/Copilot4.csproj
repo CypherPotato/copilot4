@@ -13,9 +13,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="CommonMarkSharp" Version="0.3.2" />
 		<PackageReference Include="CypherPotato.CommandLine" Version="1.0.1" />
 		<PackageReference Include="CypherPotato.SqliteDictionary" Version="0.4.0-beta1" />
-		<PackageReference Include="Markdig" Version="0.40.0" />
 		<PackageReference Include="Spectre.Console" Version="0.49.2-preview.0.75" />
 		<PackageReference Include="Spectre.Console.Json" Version="0.49.2-preview.0.75" />
 	</ItemGroup>
