@@ -2,11 +2,11 @@
 
 Copilot4 is an experimental AI chatbot project that works in your console, similar to [Ollama](https://ollama.com/), but for cloud models like Deepseek, Groq, OpenAI, Mistral, or any other model compatible with the OpenAI API.
 
-https://github.com/user-attachments/assets/b02f1ba5-24e1-45c5-beb7-dfa2fac626c1
+https://github.com/user-attachments/assets/7a990586-36a9-4f4c-9636-77b9e6036cf7
 
 Some of the features:
 - **Multi-models:** configure multiple models with their own *system prompts* from different sources that share an OpenAI-compatible API. Even Ollama works here.
-- **Syntax-highlighting**: automatically colored markdown responses as the AI sends you the content.
+- **Syntax-highlighting**: automatically colored markdown responses as the AI sends you the content. Also, supports code highlighting, thanks to [Prism.js](https://prismjs.com/) and [Jint](https://github.com/sebastienros/jint).
 - **Cross-platform**: written in C# as a console application.
 - **No accounts, no premium**: no extra payment for an extra feature. Everything is open-source.
 
@@ -39,7 +39,8 @@ To get started, build or download the Copilot4 distributable, then make your fir
             
             // Optional. The agent system message to use. New lines can be added in this string
             // since it is JSON5.
-            systemMessage: "You're an helpful assistant.",
+            systemMessage: "You're an helpful assistant. \
+                Multiline text is supported here too.",
             
             // Optional. Defines the transport interface for the API. Currently, only OpenAi is
             // supported.
