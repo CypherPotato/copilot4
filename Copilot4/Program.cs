@@ -67,7 +67,7 @@ readNum:
 
             CurrentChatSession.Clear ();
             if (string.IsNullOrEmpty ( CurrentModel.SystemMessage ) == false)
-                CurrentChatSession.Add ( new ChatMessage ( "system", CurrentModel.SystemMessage ) );
+                CurrentChatSession.Add ( new ChatMessage ( "system", CurrentModel.GetFormattedSystemMessage ()! ) );
         }
 
         static async Task<int> Main ( string [] args ) {
@@ -229,7 +229,7 @@ readNum:
                         case "sysprompt":
                             AnsiConsole.MarkupLineInterpolated ( $"""
                                 Current system prompt for [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}):
-                                {CurrentModel.SystemMessage ?? "<empty>"}
+                                {CurrentModel.GetFormattedSystemMessage () ?? "<empty>"}
 
                                 """ );
                             break;

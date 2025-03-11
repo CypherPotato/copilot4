@@ -1,4 +1,6 @@
-﻿using Copilot4.SyntaxHighlighter;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
+using Copilot4.SyntaxHighlighter;
 
 namespace Copilot4;
 
@@ -16,11 +18,24 @@ public sealed class ChatModel {
     public SyntaxHighlightingMode SyntaxHighlighting { get; set; } = SyntaxHighlightingMode.Markdown;
     public required ChatModelParameters Model { get; set; }
 
+    public string? GetFormattedSystemMessage () {
+        return SanitizePrompt ( this.SystemMessage );
+    }
+
     public ISyntaxHighlighter GetSyntaxHighlighter () {
         return this.SyntaxHighlighting switch {
             SyntaxHighlightingMode.Markdown => new MarkdownSyntaxHighlighter (),
             _ => new PlainSyntaxHighlighter ()
         };
+    }
+
+    [return: NotNullIfNotNull ( nameof ( prompt ) )]
+    public static string? SanitizePrompt ( string? prompt ) {
+        if (prompt is null)
+            return null;
+
+        var matches = Regex.Split ( prompt, @"\\\s*$\s*", RegexOptions.Multiline );
+        return string.Join ( "", matches );
     }
 }
 

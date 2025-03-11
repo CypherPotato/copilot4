@@ -48,7 +48,7 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
         }
         else if (block is FencedCode fcode) {
             AnsiConsole.MarkupLineInterpolated ( $"[gray]--- {fcode.Info}[/]" );
-            AnsiConsole.Write ( new RawText ( $"{fcode.Contents.Trim ()}\n", new Style ( foreground: Color.CadetBlue_1 ) ) );
+            AnsiConsole.Write ( new CodeHighlighter ( fcode.Contents.Trim (), fcode.Info ) );
             AnsiConsole.MarkupLine ( $"[gray]---[/]\n" );
         }
         else if (block is IndentedCode icode) {
