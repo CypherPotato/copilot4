@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Text;
+using Copilot4.Entity;
 using LightJson;
 using Spectre.Console;
 
@@ -14,6 +16,42 @@ public static class Inference {
         public string? ResponseContents { get; init; }
 
         public InferenceException ( string message ) : base ( message ) { }
+    }
+
+    public static string SerializeContext ( IList<ChatMessage> messages ) {
+        StringBuilder sb = new StringBuilder ();
+
+        foreach (var message in messages) {
+
+            string roleLine = message.Role.ToLowerInvariant () switch {
+                "user" => "User asked the Assistant",
+                "assistant" => "Assistant replied to user",
+                _ => string.Empty
+            };
+
+            if (string.IsNullOrEmpty ( roleLine ))
+                continue;
+
+            sb.AppendLine ( $"""
+                {roleLine}:
+                {message.Message}
+
+                """ );
+        }
+
+        return sb.ToString ();
+    }
+
+    public static int GetTokenCount ( string input ) {
+        return AI.Dev.OpenAI.GPT.GPT3Tokenizer.Encode ( input ).Count;
+    }
+
+    public static async Task<string> GetNextMessageAsync ( ChatModel model, IList<ChatMessage> messages, CancellationToken cancellationToken ) {
+        StringBuilder sb = new StringBuilder ();
+        await foreach (var chunk in GetCompletionsStreamAsync ( model, messages, cancellationToken )) {
+            sb.Append ( chunk );
+        }
+        return sb.ToString ();
     }
 
     public static async IAsyncEnumerable<string> GetCompletionsStreamAsync ( ChatModel model, IList<ChatMessage> chatSession, [EnumeratorCancellation] CancellationToken cancellationToken ) {

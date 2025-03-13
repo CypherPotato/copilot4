@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text;
+using CommandLine;
+using Copilot4.Entity;
 using Copilot4.SyntaxHighlighter;
 using CypherPotato.SqliteCollections;
 using LightJson;
@@ -15,60 +17,21 @@ namespace Copilot4 {
 
     internal class Program {
 
-        static SqliteDictionary Store = SqliteDictionary.Open ( "appstore" );
-        static List<ChatMessage> CurrentChatSession = new List<ChatMessage> ();
-        static ChatModel? CurrentModel;
-        static AppConfiguration? AppConfiguration;
+        const string APP_VERSION = "v0.2";
+
+        static volatile bool IsWaitingResponse = false;
+        static CancellationTokenSource ConsoleCancellation = new CancellationTokenSource ();
+        static ChatContext CurrentChat = null!;
+        static ChatModel CurrentModel = null!;
+        static AppConfiguration AppConfiguration = null!;
 
         static string AppDirectory = Path.Combine ( Environment.GetFolderPath ( Environment.SpecialFolder.CommonApplicationData ), "Copilot4" );
         static string AppConfigPath = Path.Combine ( AppDirectory, "app.json5" );
         static string AppPromptHistoryPath = Path.Combine ( AppDirectory, "history" );
+        public static string AppDatabase = Path.Combine ( AppDirectory, "appstore.db" );
 
-        static void SwitchModel () {
-            if (AppConfiguration is null)
-                return;
-
-            AnsiConsole.WriteLine ( "Please, insert the number of the desired model to use:" );
-            for (int i = 0; i < AppConfiguration.Models.Length; i++) {
-                ChatModel? model = AppConfiguration.Models [ i ];
-                string nums = (i + 1).ToString ().PadLeft ( 3 );
-                AnsiConsole.MarkupLineInterpolated ( $"- [aquamarine3]{nums}[/]: {model.Name ?? "<unnamed>"} [gray]{model.Model.Name}[/]" );
-            }
-
-            AnsiConsole.WriteLine ();
-readNum:
-            AnsiConsole.Markup ( $"Model (1-{AppConfiguration.Models.Length + 1}): " );
-            string? result = Console.ReadLine ();
-
-            if (string.IsNullOrEmpty ( result ))
-                return;
-
-            if (!int.TryParse ( result, out int num )) {
-                goto readNum;
-            }
-            if (num < 1 || num > AppConfiguration.Models.Length + 1) {
-                goto readNum;
-            }
-
-            CurrentModel = AppConfiguration.Models [ num - 1 ];
-            ResetContext ();
-
-            Store [ "LastModel" ] = CurrentModel.Name;
-
-            AnsiConsole.MarkupLine ( $"""
-                You're talking with [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}). Type [bold]/help[/] to get help.
-
-                """ );
-        }
-
-        static void ResetContext () {
-            if (CurrentModel is null)
-                return;
-
-            CurrentChatSession.Clear ();
-            if (string.IsNullOrEmpty ( CurrentModel.SystemMessage ) == false)
-                CurrentChatSession.Add ( new ChatMessage ( "system", CurrentModel.GetFormattedSystemMessage ()! ) );
-        }
+        static SqliteDictionary ConfigurationStore = SqliteDictionary.Open ( AppDatabase, tableName: "base" );
+        static DbRepository<ChatContext> Chats = new DbRepository<ChatContext> ();
 
         static async Task<int> Main ( string [] args ) {
 
@@ -115,9 +78,6 @@ readNum:
                 Environment.Exit ( 1 );
             }
 
-            bool isSendingMessage = false;
-            CancellationTokenSource cancellation = new CancellationTokenSource ();
-
             AppConfiguration = appJsonData.Get<AppConfiguration> ();
             if (AppConfiguration.EnableChatDecorations == false) {
                 AnsiConsole.Console.Profile.Capabilities.ColorSystem = ColorSystem.NoColors;
@@ -131,9 +91,9 @@ readNum:
                 Environment.Exit ( 1 );
             }
 
-            if (Store [ "LastModel" ] is string lastModelName) {
+            if (ConfigurationStore [ "LastModel" ] is string lastModelName) {
                 CurrentModel = AppConfiguration.Models
-                    .FirstOrDefault ( m => m.Name == lastModelName );
+                    .FirstOrDefault ( m => m.Name == lastModelName )!;
 
                 if (CurrentModel is null) {
                     AnsiConsole.MarkupLineInterpolated ( $"[lightgoldenrod3]Warning:[/] The last used model (\"{lastModelName}\") is not available.\n" );
@@ -146,10 +106,10 @@ readNum:
 
             Console.TreatControlCAsInput = true;
             Console.CancelKeyPress += ( object? sender, ConsoleCancelEventArgs e ) => {
-                if (isSendingMessage) {
+                if (IsWaitingResponse) {
                     AnsiConsole.MarkupLine ( "\n\n[gray]Operation cancelled by the user.[/]" );
-                    cancellation.Cancel ();
-                    cancellation = new CancellationTokenSource ();
+                    ConsoleCancellation.Cancel ();
+                    ConsoleCancellation = new CancellationTokenSource ();
                 }
                 else {
                     AnsiConsole.MarkupLine ( "Bye!" );
@@ -162,13 +122,9 @@ readNum:
                 configuration: new PromptConfiguration (
                     prompt: new FormattedString ( $">>> ", new ConsoleFormat ( Bold: true ) ) ) );
 
-            AnsiConsole.MarkupLine ( $"""
-                Welcome to [bold]Copilot4[/].
-                You're talking with [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}). Type [bold]/help[/] to get help.
+            AnsiConsole.MarkupLine ( $"Welcome to [bold]Copilot4[/]. [grey]Version {APP_VERSION}[/]" );
 
-                """ );
-
-            ResetContext ();
+            ReloadContext ( CurrentModel );
 
             while (true) {
                 var question = await prompt.ReadLineAsync ();
@@ -179,80 +135,23 @@ readNum:
                 }
                 if (questionText.StartsWith ( '/' )) {
                     string command = questionText [ 1.. ];
+                    int commandResult = await HandleCommand ( command );
 
-                    switch (command) {
-                        case "help":
-                            AnsiConsole.MarkupLine ( """
-                                Current chat and model:
-                                    [white]/switch[/]      Open the switch menu to switch the current model.
-                                    [white]/clear[/]       Clears ONLY the console window.
-                                    [white]/reset[/]       Clears both the console window and context.
-
-                                Configuration:
-                                    [white]/sysprompt[/]   Prints the current model system prompt.
-                                    [white]/config[/]      Opens the configuration file to edit.
-                                    [white]/reload[/]      Reloads the current configuration. This also resets the context
-                                                 and window.
-
-                                Other:
-                                    [white]/exit[/]        Closes the chat window.
-
-                                """ );
-                            break;
-
-                        case "config":
-                            Process.Start ( new ProcessStartInfo () { FileName = AppConfigPath, UseShellExecute = true } )?.Start ();
-                            break;
-
-                        case "reload":
-                            AnsiConsole.Clear ();
-                            AnsiConsole.Reset ();
-                            return await Main ( args );
-
-                        case "switch":
-                            SwitchModel ();
-                            continue;
-
-                        case "clear":
-                            AnsiConsole.Clear ();
-                            break;
-
-                        case "reset":
-                            ResetContext ();
-                            AnsiConsole.Clear ();
-                            break;
-
-                        case "exit":
-                            Environment.Exit ( 0 );
-                            break;
-
-                        case "sysprompt":
-                            AnsiConsole.MarkupLineInterpolated ( $"""
-                                Current system prompt for [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}):
-                                {CurrentModel.GetFormattedSystemMessage () ?? "<empty>"}
-
-                                """ );
-                            break;
-
-                        default:
-                            AnsiConsole.MarkupLineInterpolated ( $"""
-                                Invalid command.
-
-                                """ );
-                            break;
+                    if (commandResult == 1) {
+                        return await Main ( args );
                     }
 
                     continue;
                 }
 
                 StringBuilder assistantMessageBuilder = new StringBuilder ();
-                CurrentChatSession.Add ( new ChatMessage ( "user", questionText ) );
+                CurrentChat.Messages.Add ( new ChatMessage ( "User", questionText ) );
 
-                isSendingMessage = true;
                 try {
                     using ISyntaxHighlighter syntaxHighlighter = CurrentModel.GetSyntaxHighlighter ();
 
-                    await foreach (var chunk in Inference.GetCompletionsStreamAsync ( CurrentModel, CurrentChatSession, cancellation.Token )) {
+                    IsWaitingResponse = true;
+                    await foreach (var chunk in Inference.GetCompletionsStreamAsync ( CurrentModel, CurrentChat.Messages, ConsoleCancellation.Token )) {
                         assistantMessageBuilder.Append ( chunk );
                         syntaxHighlighter.Write ( chunk );
                     }
@@ -275,21 +174,244 @@ readNum:
                 }
                 catch (Exception ex) {
                     AnsiConsole.MarkupLineInterpolated ( $"""
-                        [indianred]Error:[/] exception raised from the HTTP client:
+                        [indianred]Error:[/] exception raised from the AI client:
                             [yellow]{ex.Message}[/]
 
                         """ );
                 }
                 finally {
-                    isSendingMessage = false;
+                    IsWaitingResponse = false;
 
                     if (assistantMessageBuilder.Length > 0) {
-                        CurrentChatSession.Add ( new ChatMessage ( "Assistant", assistantMessageBuilder.ToString () ) );
+                        CurrentChat.Messages.Add ( new ChatMessage ( "Assistant", assistantMessageBuilder.ToString () ) );
                     }
+
+                    if (CurrentChat.ModelName != null)
+                        Chats.AddOrUpdate ( CurrentChat );
 
                     AnsiConsole.Write ( "\n\n" );
                 }
             }
+        }
+
+        static async ValueTask<int> HandleCommand ( string command ) {
+
+            if (string.IsNullOrEmpty ( command ))
+                return -1;
+
+            var cmdValues = CommandLineParser.Split ( command );
+
+            switch (cmdValues [ 0 ]) {
+                case "help":
+                    AnsiConsole.MarkupLine ( """
+                        Current chat and model:
+                            [white]/switch[/]
+                                Open the switch menu to switch the current model.
+                            [white]/clear[/]
+                                Clears ONLY the console window.
+                            [white]/reset[/]
+                                Clears both the console window and context.
+                            [white]/summarize[/]
+                                Summarizes and compresses the current chat history using the
+                                base model.
+                            [white]/tokens[/]
+                                Gets an approximate number of tokens used in the current
+                                conversation.
+
+                        Configuration:
+                            [white]/sysprompt[/]
+                                Prints the current model system prompt.
+                            [white]/config[/]
+                                Opens the configuration file to edit.
+                            [white]/reload[/]
+                                Reloads the current configuration. This also resets the context
+                                and window.
+
+                        Other:
+                            [white]/exit[/]
+                                Closes the chat window.
+
+                        """ );
+                    break;
+
+                case "config":
+                    Process.Start ( new ProcessStartInfo () { FileName = AppConfigPath, UseShellExecute = true } )?.Start ();
+                    break;
+
+                case "reload":
+                    AnsiConsole.Clear ();
+                    AnsiConsole.Reset ();
+                    return 1;
+
+                case "switch":
+                    if (cmdValues.Length == 1) {
+                        SwitchModel ();
+                    }
+                    else {
+                        var index = cmdValues [ 1 ];
+                        if (!int.TryParse ( index, out int iindex ) || iindex < 0 || iindex > AppConfiguration.Models.Length) {
+                            AnsiConsole.MarkupLineInterpolated ( $"""
+                                Please, insert an number from 0-{AppConfiguration.Models.Length}.
+
+                                """ );
+
+                            return -1;
+                        }
+
+                        SetSelectedModel ( AppConfiguration.Models [ iindex - 1 ] );
+                    }
+                    break;
+
+                case "clear":
+                    AnsiConsole.Clear ();
+                    break;
+
+                case "tokens":
+                    AnsiConsole.MarkupLineInterpolated ( $"""
+                        Current conversation usage: [white]~{CurrentChat.GetTokenUsage ():N0} tokens[/]
+
+                        """ );
+                    break;
+
+                case "reset":
+                    Chats.Remove ( CurrentChat );
+                    ReloadContext ( CurrentModel );
+                    AnsiConsole.Clear ();
+                    break;
+
+                case "summarize":
+
+                    if (AppConfiguration.BaseModel is null) {
+                        AnsiConsole.MarkupLineInterpolated ( $"""
+                            No base model was defined in the app configuration.
+
+                            """ );
+                        return -1;
+                    }
+                    else {
+                        var chatTranscript = Inference.SerializeContext ( CurrentChat.Messages );
+                        var summarizeModel = AppConfiguration.BaseModel.GetChatModel ( InternalModel.InternalModeProgram.SummarizeConversation );
+
+                        double fromTokens = CurrentChat.GetTokenUsage ();
+
+                        try {
+                            IsWaitingResponse = true;
+
+                            List<ChatMessage> summarizeChat = new List<ChatMessage> ();
+                            summarizeChat.Add ( new ChatMessage ( "System", summarizeModel.GetFormattedSystemMessage () ?? string.Empty ) );
+                            summarizeChat.Add ( new ChatMessage ( "User", chatTranscript ) );
+
+                            var summary = await Inference.GetNextMessageAsync ( summarizeModel, summarizeChat, ConsoleCancellation.Token );
+
+                            CurrentChat.Messages.Clear ();
+                            if (CurrentModel.GetFormattedSystemMessage () is { Length: > 0 } modelSystemMessage) {
+                                CurrentChat.Messages.Add ( new ChatMessage ( "System", modelSystemMessage ) );
+                            }
+
+                            CurrentChat.Messages.Add ( new ChatMessage ( "User", $"Context from last conversation:\n\n{summary}" ) );
+
+                            Chats.AddOrUpdate ( CurrentChat );
+
+                            double toTokens = Inference.GetTokenCount ( summary );
+                            double reducedAmount = (fromTokens - toTokens) / fromTokens * 100;
+                            AnsiConsole.MarkupLineInterpolated ( $"""
+                                Chat shortened and summarized. From [white]~{fromTokens:N0}[/] to [white]~{toTokens:N0}[/] tokens (-{reducedAmount:N2}%)
+
+                                """ );
+                        }
+                        catch {
+                            ;
+                        }
+                        finally {
+                            IsWaitingResponse = false;
+                        }
+                    }
+
+                    break;
+
+                case "exit":
+                    Environment.Exit ( 0 );
+                    break;
+
+                case "sysprompt":
+                    AnsiConsole.MarkupLineInterpolated ( $"""
+                        Current system prompt for [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}):
+                        {CurrentChat.GetSystemMessage () ?? "<empty>"}
+
+                        """ );
+                    break;
+
+                default:
+                    AnsiConsole.MarkupLineInterpolated ( $"""
+                        Invalid command.
+
+                        """ );
+                    break;
+            }
+
+            return 0;
+        }
+
+        static void SwitchModel () {
+
+            if (AppConfiguration is null)
+                return;
+
+            AnsiConsole.WriteLine ( "Please, insert the number of the desired model to use:" );
+            for (int i = 0; i < AppConfiguration.Models.Length; i++) {
+                ChatModel? model = AppConfiguration.Models [ i ];
+                string nums = (i + 1).ToString ().PadLeft ( 3 );
+                AnsiConsole.MarkupLineInterpolated ( $"- [aquamarine3]{nums}[/]: {model.Name ?? "<unnamed>"} [gray]{model.Model.Name}[/]" );
+            }
+
+            AnsiConsole.WriteLine ();
+readNum:
+            AnsiConsole.Markup ( $"Model (1-{AppConfiguration.Models.Length + 1}): " );
+            string? result = Console.ReadLine ();
+
+            if (string.IsNullOrEmpty ( result ))
+                return;
+
+            if (!int.TryParse ( result, out int num )) {
+                goto readNum;
+            }
+            if (num < 1 || num > AppConfiguration.Models.Length + 1) {
+                goto readNum;
+            }
+
+            SetSelectedModel ( AppConfiguration.Models [ num - 1 ] );
+        }
+
+        static void SetSelectedModel ( ChatModel model ) {
+            CurrentModel = model;
+            ConfigurationStore [ "LastModel" ] = CurrentModel.Name;
+            ReloadContext ( model );
+        }
+
+        static void ReloadContext ( ChatModel model ) {
+
+            bool isNewChat = true;
+
+            var loadedChat = Chats.FirstOrDefault ( c => c.ModelName == model.Name );
+            if (loadedChat is null) {
+                loadedChat = new ChatContext () { ModelName = model.Name };
+                var systemMessage = model.GetFormattedSystemMessage ();
+                if (systemMessage != null)
+                    loadedChat.Messages.Add ( new ChatMessage ( "System", systemMessage ) );
+            }
+            else {
+                isNewChat = false;
+            }
+
+            CurrentChat = loadedChat;
+
+            AnsiConsole.MarkupLine ( $"You're talking with [aquamarine3]{CurrentModel.Name}[/] ({CurrentModel.Model.Name}). Type [bold]/help[/] to get help." );
+            if (!isNewChat) {
+                AnsiConsole.MarkupLineInterpolated ( $"[darkkhaki]Important: [/]you are continuing a previous conversation with [white]{loadedChat.Messages.Count} messages[/] [gray](~ {loadedChat.GetTokenUsage ():N0} tokens)[/]." );
+                AnsiConsole.MarkupLineInterpolated ( $"Type [bold]/reset[/] to start a fresh new conversation." );
+            }
+
+            AnsiConsole.WriteLine ();
         }
     }
 }

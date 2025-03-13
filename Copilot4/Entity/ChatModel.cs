@@ -2,12 +2,7 @@
 using System.Text.RegularExpressions;
 using Copilot4.SyntaxHighlighter;
 
-namespace Copilot4;
-
-public sealed class AppConfiguration {
-    public ChatModel [] Models { get; set; } = Array.Empty<ChatModel> ();
-    public bool EnableChatDecorations { get; set; } = true;
-}
+namespace Copilot4.Entity;
 
 public sealed class ChatModel {
     public string? Name { get; set; }
@@ -19,11 +14,11 @@ public sealed class ChatModel {
     public required ChatModelParameters Model { get; set; }
 
     public string? GetFormattedSystemMessage () {
-        return SanitizePrompt ( this.SystemMessage );
+        return SanitizePrompt ( SystemMessage );
     }
 
     public ISyntaxHighlighter GetSyntaxHighlighter () {
-        return this.SyntaxHighlighting switch {
+        return SyntaxHighlighting switch {
             SyntaxHighlightingMode.Markdown => new MarkdownSyntaxHighlighter (),
             _ => new PlainSyntaxHighlighter ()
         };
@@ -35,7 +30,7 @@ public sealed class ChatModel {
             return null;
 
         var matches = Regex.Split ( prompt, @"\\\s*$\s*", RegexOptions.Multiline );
-        return string.Join ( "", matches );
+        return string.Join ( "", matches ).Trim ();
     }
 }
 

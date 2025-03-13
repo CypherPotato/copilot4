@@ -17,30 +17,30 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
     bool isThinking = false;
 
     public void Dispose () {
-        this.offset = 0;
-        this.WriteCurrentBuffer ();
+        offset = 0;
+        WriteCurrentBuffer ();
     }
 
     public void Write ( string chunk ) {
-        this.sb.Append ( chunk );
-        this.WriteCurrentBuffer ();
+        sb.Append ( chunk );
+        WriteCurrentBuffer ();
     }
 
     void WriteCurrentBuffer () {
-        var data = this.cm.Parse ( this.sb.ToString () );
-        var child = data.Children.Skip ( this.blockIndex ).ToArray ();
+        var data = cm.Parse ( sb.ToString () );
+        var child = data.Children.Skip ( blockIndex ).ToArray ();
 
-        for (int i = 0; i < child.Length - this.offset; i++) {
+        for (int i = 0; i < child.Length - offset; i++) {
             var block = child [ i ];
-            this.blockIndex++;
+            blockIndex++;
 
-            this.WriteBlock ( block );
+            WriteBlock ( block );
         }
     }
 
     void WriteBlock ( Block block ) {
         if (block is Paragraph para) {
-            this.WriteInlines ( para.Inlines );
+            WriteInlines ( para.Inlines );
             AnsiConsole.WriteLine ( "\n" );
         }
         else if (block is ATXHeader header) {
@@ -62,18 +62,18 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
         else if (block is List listblock) {
             foreach (var listItem in listblock.Children) {
                 AnsiConsole.Write ( new RawText ( "- " ) );
-                this.WriteBlock ( listItem );
+                WriteBlock ( listItem );
             }
         }
         else if (block is ListItem listitem) {
             foreach (var listItemData in listitem.Children) {
-                this.WriteBlock ( listItemData );
+                WriteBlock ( listItemData );
             }
         }
         else if (block is BlockQuote quote) {
             foreach (var quoteItem in quote.Children) {
                 AnsiConsole.Write ( new RawText ( "> ", new Style ( foreground: Color.Grey ) ) );
-                this.WriteBlock ( quoteItem );
+                WriteBlock ( quoteItem );
             }
         }
         else if (block is HtmlBlock htmBlock) {
@@ -90,10 +90,10 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
 
             if (inline is InlineString istr) {
                 if (text.StartsWith ( "<think>" )) {
-                    this.isThinking = true;
+                    isThinking = true;
                 }
 
-                if (this.isThinking) {
+                if (isThinking) {
                     AnsiConsole.Write ( new RawText ( text, new Style ( foreground: Color.Grey, decoration: Decoration.Italic ) ) );
                 }
                 else {
@@ -101,7 +101,7 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
                 }
 
                 if (text.EndsWith ( "</think>" )) {
-                    this.isThinking = false;
+                    isThinking = false;
                 }
             }
             else if (inline is StrongEmphasis iespm) {
@@ -127,7 +127,7 @@ public sealed class MarkdownSyntaxHighlighter : ISyntaxHighlighter {
             }
             else if (inline is Image img) {
                 // not supported yet
-                this.WriteInlines ( [ img.Link ] );
+                WriteInlines ( [ img.Link ] );
             }
             else {
                 ;

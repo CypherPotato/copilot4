@@ -9,16 +9,16 @@ public sealed class RawText : Renderable {
     public string Text { get; }
 
     public RawText ( string text ) {
-        this.Text = text;
-        this.Style = new Style ();
+        Text = text;
+        Style = new Style ();
     }
 
     public RawText ( string text, Style style ) {
-        this.Text = text;
-        this.Style = style;
+        Text = text;
+        Style = style;
     }
 
     protected override IEnumerable<Segment> Render ( RenderOptions options, int maxWidth ) {
-        yield return new Segment ( this.Text, this.Style );
+        yield return new Segment ( Text, Style );
     }
 }

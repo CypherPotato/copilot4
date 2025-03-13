@@ -7,18 +7,18 @@ using Spectre.Console.Rendering;
 namespace Copilot4;
 
 public sealed class CodeHighlighter : Renderable {
-    static Engine JsEngine = new Engine ();
+    static Engine JsEngine;
 
     static CodeHighlighter () {
-        JsEngine.Execute ( Prism.PrismJsBundle );
+        JsEngine = new Engine ().Execute ( Prism.PrismJsBundle );
     }
 
     public string Code { get; }
     public string? Language { get; }
 
     public CodeHighlighter ( string code, string? language ) {
-        this.Code = code;
-        this.Language = language;
+        Code = code;
+        Language = language;
     }
 
     protected override IEnumerable<Segment> Render ( RenderOptions options, int maxWidth ) {
@@ -33,13 +33,13 @@ public sealed class CodeHighlighter : Renderable {
         }
 
 
-        if (string.IsNullOrEmpty ( this.Language )) {
+        if (string.IsNullOrEmpty ( Language )) {
             goto il_return_raw;
         }
         else {
             var evaluatedSyntax = JsEngine
-                .SetValue ( "codeContents", this.Code )
-                .SetValue ( "codeLanguage", this.Language )
+                .SetValue ( "codeContents", Code )
+                .SetValue ( "codeLanguage", Language )
                 .Evaluate ( """
                 if (Prism.languages[codeLanguage]) {
                     return Prism.highlight(codeContents, Prism.languages[codeLanguage], codeLanguage);
@@ -73,7 +73,7 @@ public sealed class CodeHighlighter : Renderable {
                     else if (ContainsAny ( classes, "property", "number", "constant", "symbol", "inserted", "unit" )) {
                         yield return new Segment ( children.TextContent, new Style ( foreground: Color.FromHex ( "b5cea8" ) ) );
                     }
-                    else if (ContainsAny ( classes, "selector", "attr-value", "string", "char", "builtin", "deleted" )) {
+                    else if (ContainsAny ( classes, "selector", "attr-value", "string", "interpolation-string", "char", "builtin", "deleted" )) {
                         yield return new Segment ( children.TextContent, new Style ( foreground: Color.FromHex ( "ce9178" ) ) );
                     }
                     else if (ContainsAny ( classes, "operator", "entity" )) {
@@ -105,7 +105,7 @@ public sealed class CodeHighlighter : Renderable {
                     else if (ContainsAny ( classes, "parameter", "attr-name", "interpolation", "console", "variable" )) {
                         yield return new Segment ( children.TextContent, new Style ( foreground: Color.FromHex ( "9cdcfe" ) ) );
                     }
-                    else if (ContainsAny ( classes, "pontuaction", "tag" )) {
+                    else if (ContainsAny ( classes, "punctuation", "tag" )) {
                         yield return new Segment ( children.TextContent, new Style ( foreground: Color.FromHex ( "808080" ) ) );
                     }
                     else {
@@ -122,7 +122,7 @@ public sealed class CodeHighlighter : Renderable {
         yield break;
 
 il_return_raw:
-        yield return new Segment ( this.Code, new Style ( foreground: Color.FromHex ( "d4d4d4" ) ) );
+        yield return new Segment ( Code, new Style ( foreground: Color.FromHex ( "d4d4d4" ) ) );
         yield return new Segment ( "\n" );
     }
 }
