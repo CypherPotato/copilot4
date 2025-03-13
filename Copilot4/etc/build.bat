@@ -11,4 +11,4 @@ dotnet publish "%~dp0/../Copilot4.csproj" --nologo ^
 	--self-contained true ^
 	-p:PublishReadyToRun=true ^
 	-p:PublishSingleFile=true ^
-	-o "%~dp0bin/Build/copilot4-v0.1-%NAME%/"
+	-o "%~dp0bin/Build/copilot4-v0.2-%NAME%/"

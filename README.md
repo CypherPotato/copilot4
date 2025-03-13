@@ -16,7 +16,6 @@ Some of the features:
 
 And some of the features I plan to add soon:
 - **Multi-modal chat**: for models that support multi-modal conversations (images, documents), allow attaching them.
-- **Memory support**: embed a memory database through an alternative model.
 - **RAG support**: add support for RAG mechanisms. I still have to figure out how to do this.
 
 To get started, build or download the Copilot4 distributable, then make your first run. After that, open it again and type `/config`. There, you can define your own models definitions by the template:
@@ -27,6 +26,14 @@ To get started, build or download the Copilot4 distributable, then make your fir
     // unicode support.
     // Defaults to true.
     enableChatDecorations: true,
+
+    // Optional. Defines an base model used for the application tasks, such as summarizing
+    // the chat conversation. You should use an smaller/cheapier model here.
+    baseModel: {
+        endpointUrl: "https://api.groq.com/openai/v1/chat/completions",
+        apiKey: "gsk_...",
+        modelName: "gemma2-9b-it"
+    },
     
     // The actual model/agent list.
     models: [
